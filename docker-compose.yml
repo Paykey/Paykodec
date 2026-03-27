@@ -1,0 +1,14 @@
+services:
+  db:
+    image: postgres:15
+    container_name: Paykodec_db
+    restart: always
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: media_db
+    ports:
+      - "5432:5432"
+    volumes:
+      # DB 데이터가 날아가지 않게 폴더와 연결
+      - ./postgres_data:/var/lib/postgresql/data
