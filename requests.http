@@ -1,0 +1,17 @@
+### 헬스 체크                                                                                                  
+GET http://localhost:8080/health                                                                               
+                                                                                                                
+### DB 헬스 체크                                                                                               
+GET http://localhost:8080/health/db                                                                            
+                                                                                                                
+### 라이브러리 목록 조회                                                                                       
+GET http://localhost:8080/libraries                                                                            
+                                                                                                                
+### 라이브러리 등록                                                                                            
+POST http://localhost:8080/libraries                                                                           
+Content-Type: application/json; charset=utf-8                                                                  
+                                                                                                                
+{                                                                                                              
+  "name": "내 영화",                                                                                           
+  "folder_path": "D:/media/movies"                                                                             
+}                     
