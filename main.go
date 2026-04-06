@@ -1,8 +1,10 @@
 package main
 
 import (
+	"database/sql"
 	"log"
-	"net/http"
+
+	"github.com/gin-gonic/gin"
 )
 
 const serverAddr = ":8080"
@@ -23,10 +25,8 @@ func main() {
 		log.Fatal("error:", err)
 	}
 
-	// 상태 확인용 API와 라이브러리 API를 라우트에 등록한다.
-	http.HandleFunc("/health", healthHandler)
-	http.HandleFunc("/health/db", healthDBHandler(db))
-	http.HandleFunc("/libraries", handleLibraries(db))
+	// Gin 엔진을 만들고 상태 확인용 API와 라이브러리 API를 등록한다.
+	router := setupRouter(db)
 
 	// 서버 실행 전에 접속 가능한 주소를 로그로 남긴다.
 	log.Println("server started on", serverAddr)
@@ -34,8 +34,20 @@ func main() {
 	log.Println("db health check: http://localhost" + serverAddr + "/health/db")
 	log.Println("libraries: http://localhost" + serverAddr + "/libraries")
 
-	// 8080 포트에서 HTTP 서버를 시작한다.
-	if err := http.ListenAndServe(serverAddr, nil); err != nil {
-		log.Fatal("error: HTTP server failed:", err)
+	// 8080 포트에서 Gin HTTP 서버를 시작한다.
+	if err := router.Run(serverAddr); err != nil {
+		log.Fatal("error: Gin server failed:", err)
 	}
+}
+
+func setupRouter(db *sql.DB) *gin.Engine {
+	// Default 엔진은 로거와 복구 미들웨어를 포함한 라우터를 만든다.
+	router := gin.Default()
+
+	router.GET("/health", healthHandler)
+	router.GET("/health/db", healthDBHandler(db))
+	router.GET("/libraries", listLibrariesHandler(db))
+	router.POST("/libraries", createLibraryHandler(db))
+
+	return router
 }
