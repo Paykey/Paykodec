@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -52,4 +53,53 @@ func TestHealthHandlerRejectsPostByRoute(t *testing.T) {
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("expected status %d, got %d", http.StatusNotFound, rec.Code)
 	}
+}
+
+func TestHealthDBHandlerReturnsOK(t *testing.T) {
+	// DB Ping 성공 상황을 가짜 객체로 만들어 200 응답을 확인한다.
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	router.GET("/health/db", healthDBHandler(fakeDBPinger{}))
+
+	req := httptest.NewRequest(http.MethodGet, "/health/db", nil)
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, rec.Code)
+	}
+
+	var body healthResponse
+	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+
+	if body.Status != "ok" {
+		t.Fatalf("expected status field to be ok, got %q", body.Status)
+	}
+}
+
+func TestHealthDBHandlerReturnsInternalServerError(t *testing.T) {
+	// DB Ping 실패 상황을 가짜 객체로 만들어 500 응답을 확인한다.
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	router.GET("/health/db", healthDBHandler(fakeDBPinger{err: errors.New("db down")}))
+
+	req := httptest.NewRequest(http.MethodGet, "/health/db", nil)
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("expected status %d, got %d", http.StatusInternalServerError, rec.Code)
+	}
+}
+
+type fakeDBPinger struct {
+	err error
+}
+
+func (f fakeDBPinger) Ping() error {
+	return f.err
 }
