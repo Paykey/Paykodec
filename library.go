@@ -4,9 +4,11 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"net/http"
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/lib/pq"
 )
 
 type library struct {
@@ -18,6 +20,10 @@ type library struct {
 type createLibraryRequest struct {
 	Name       string `json:"name"`
 	FolderPath string `json:"folder_path"`
+}
+
+type libraryCreator interface {
+	Exec(query string, args ...any) (sql.Result, error)
 }
 
 func listLibrariesHandler(db *sql.DB) gin.HandlerFunc {
@@ -87,10 +93,10 @@ func listLibrariesHandler(db *sql.DB) gin.HandlerFunc {
 	}
 }
 
-func createLibraryHandler(db *sql.DB) gin.HandlerFunc {
+func createLibraryHandler(db libraryCreator) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// 요청 본문 JSON을 읽고, 공백 제거와 필수값 검사를 함께 수행한다.
-		req, err := decodeCreateLibraryRequest(c)
+		req, err := decodeCreateLibraryReq(c)
 		if err != nil {
 			writeJSON(c, 400, messageResponse{
 				Message: err.Error(),
@@ -104,20 +110,33 @@ func createLibraryHandler(db *sql.DB) gin.HandlerFunc {
 		VALUES ($1, $2)
 	`, req.Name, req.FolderPath)
 		if err != nil {
-			writeJSON(c, 500, messageResponse{
-				Message: "failed to create library; check for duplicate folder paths",
+			// PostgreSQL unique violation(23505)은 중복 데이터 요청이므로 409로 응답한다.
+			if isUniqueViolation(err) {
+				writeJSON(c, http.StatusConflict, messageResponse{
+					Message: "folder_path already exists",
+				})
+				return
+			}
+
+			writeJSON(c, http.StatusInternalServerError, messageResponse{
+				Message: "failed to create library",
 			})
 			return
 		}
 
 		// 등록이 끝나면 생성 성공 상태 코드와 메시지를 반환한다.
-		writeJSON(c, 201, messageResponse{
+		writeJSON(c, http.StatusCreated, messageResponse{
 			Message: "library created",
 		})
 	}
 }
 
-func decodeCreateLibraryRequest(c *gin.Context) (createLibraryRequest, error) {
+func isUniqueViolation(err error) bool {
+	var pqErr *pq.Error
+	return errors.As(err, &pqErr) && pqErr.Code == "23505"
+}
+
+func decodeCreateLibraryReq(c *gin.Context) (createLibraryRequest, error) {
 	var req createLibraryRequest
 	rawBody, err := c.GetRawData()
 	if err != nil {

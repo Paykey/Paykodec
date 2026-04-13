@@ -1,4 +1,4 @@
-# 🎬 Paykodec
+﻿# 🎬 Paykodec
 
 > Go와 PostgreSQL로 만들어보는 나만의 미디어 서버 백엔드
 
@@ -132,6 +132,14 @@ go test ./...
 ```json
 {
   "message": "name and folder_path are required"
+}
+```
+
+폴더 경로 중복 에러(HTTP 409):
+
+```json
+{
+  "message": "folder_path already exists"
 }
 ```
 
