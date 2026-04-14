@@ -4,7 +4,9 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -131,9 +133,72 @@ func createLibraryHandler(db libraryCreator) gin.HandlerFunc {
 	}
 }
 
+func deleteLibraryHandler(db libraryCreator) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		// 경로 파라미터(:id)를 정수로 파싱한다.
+		id, err := parseLibraryID(c.Param("id"))
+		if err != nil {
+			writeJSON(c, http.StatusBadRequest, messageResponse{
+				Message: err.Error(),
+			})
+			return
+		}
+
+		// ID 기준으로 라이브러리를 삭제한다.
+		result, err := db.Exec(`
+		DELETE FROM libraries
+		WHERE id = $1
+	`, id)
+		if err != nil {
+			writeJSON(c, http.StatusInternalServerError, messageResponse{
+				Message: "failed to delete library",
+			})
+			return
+		}
+
+		// 실제로 삭제된 행 수를 보고, 대상이 없었는지 판단한다.
+		affected, err := result.RowsAffected()
+		if err != nil {
+			writeJSON(c, http.StatusInternalServerError, messageResponse{
+				Message: "failed to confirm deletion result",
+			})
+			return
+		}
+
+		if affected == 0 {
+			writeJSON(c, http.StatusNotFound, messageResponse{
+				Message: "library not found",
+			})
+			return
+		}
+
+		writeJSON(c, http.StatusOK, messageResponse{
+			Message: "library deleted",
+		})
+	}
+}
+
 func isUniqueViolation(err error) bool {
 	var pqErr *pq.Error
 	return errors.As(err, &pqErr) && pqErr.Code == "23505"
+}
+
+func parseLibraryID(raw string) (int, error) {
+	idText := strings.TrimSpace(raw)
+	if idText == "" {
+		return 0, errors.New("library id is required")
+	}
+
+	id, err := strconv.Atoi(idText)
+	if err != nil {
+		return 0, fmt.Errorf("library id must be a number")
+	}
+
+	if id <= 0 {
+		return 0, errors.New("library id must be greater than zero")
+	}
+
+	return id, nil
 }
 
 func decodeCreateLibraryReq(c *gin.Context) (createLibraryRequest, error) {

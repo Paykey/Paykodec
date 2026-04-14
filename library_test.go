@@ -115,10 +115,73 @@ func TestCreateLibraryDuplicatePathConflict(t *testing.T) {
 	}
 }
 
+func TestDeleteLibraryRejectsInvalidID(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	c.Params = gin.Params{{Key: "id", Value: "abc"}}
+
+	handler := deleteLibraryHandler(nil)
+	handler(c)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected status %d, got %d", http.StatusBadRequest, rec.Code)
+	}
+}
+
+func TestDeleteLibraryReturnsNotFound(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	c.Params = gin.Params{{Key: "id", Value: "999"}}
+
+	handler := deleteLibraryHandler(fakeLibraryCreator{
+		result: fakeSQLResult{rows: 0},
+	})
+	handler(c)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("expected status %d, got %d", http.StatusNotFound, rec.Code)
+	}
+}
+
+func TestDeleteLibraryReturnsOK(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	c.Params = gin.Params{{Key: "id", Value: "1"}}
+
+	handler := deleteLibraryHandler(fakeLibraryCreator{
+		result: fakeSQLResult{rows: 1},
+	})
+	handler(c)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, rec.Code)
+	}
+}
+
 type fakeLibraryCreator struct {
-	err error
+	result sql.Result
+	err    error
 }
 
 func (f fakeLibraryCreator) Exec(query string, args ...any) (result sql.Result, err error) {
-	return nil, f.err
+	if f.err != nil {
+		return nil, f.err
+	}
+
+	return f.result, nil
+}
+
+type fakeSQLResult struct {
+	rows int64
+}
+
+func (r fakeSQLResult) LastInsertId() (int64, error) {
+	return 0, nil
+}
+
+func (r fakeSQLResult) RowsAffected() (int64, error) {
+	return r.rows, nil
 }
