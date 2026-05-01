@@ -3,6 +3,7 @@ package main
 import (
 	"database/sql"
 	"log"
+	"net/http"
 
 	"github.com/gin-gonic/gin"
 )
@@ -43,6 +44,7 @@ func main() {
 func setupRouter(db *sql.DB) *gin.Engine {
 	// Default 엔진은 로거와 복구 미들웨어를 포함한 라우터를 만든다.
 	router := gin.Default()
+	router.Use(corsMiddleware())
 
 	router.GET("/health", healthHandler)
 	router.GET("/health/db", healthDBHandler(db))
@@ -51,4 +53,19 @@ func setupRouter(db *sql.DB) *gin.Engine {
 	router.DELETE("/libraries/:id", deleteLibraryHandler(db))
 
 	return router
+}
+
+func corsMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		c.Writer.Header().Set("Access-Control-Allow-Origin", "http://localhost:5173")
+		c.Writer.Header().Set("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS")
+		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+
+		if c.Request.Method == http.MethodOptions {
+			c.AbortWithStatus(http.StatusNoContent)
+			return
+		}
+
+		c.Next()
+	}
 }
