@@ -215,9 +215,15 @@ body {
 
 .media-poster {
   height: 124px;
+  width: 100%;
+  border: 0;
   background:
     radial-gradient(circle at 30% 20%, rgba(255, 255, 255, 0.35), transparent 40%),
     linear-gradient(120deg, #2c1b52 0%, #5f2cc9 45%, #a35bff 100%);
+}
+
+.media-open-btn {
+  cursor: pointer;
 }
 
 .media-meta {
@@ -247,6 +253,48 @@ body {
   background: rgba(255, 107, 158, 0.09);
   color: #ffb2d0;
   padding: 7px 8px;
+  cursor: pointer;
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(5, 3, 11, 0.72);
+  display: grid;
+  place-items: center;
+  padding: 20px;
+}
+
+.modal {
+  position: relative;
+  width: min(92vw, 520px);
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: linear-gradient(160deg, rgba(24, 14, 44, 0.95), rgba(13, 9, 24, 0.95));
+  padding: 20px;
+}
+
+.modal h3 {
+  margin-top: 0;
+  margin-bottom: 12px;
+  font-size: 28px;
+}
+
+.modal p {
+  margin: 8px 0;
+  color: var(--muted);
+}
+
+.modal-close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
   cursor: pointer;
 }
 

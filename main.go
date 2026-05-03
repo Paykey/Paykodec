@@ -49,6 +49,7 @@ func setupRouter(db *sql.DB) *gin.Engine {
 	router.GET("/health", healthHandler)
 	router.GET("/health/db", healthDBHandler(db))
 	router.GET("/libraries", listLibrariesHandler(db))
+	router.GET("/libraries/:id", getLibraryHandler(db))
 	router.POST("/libraries", createLibraryHandler(db))
 	router.DELETE("/libraries/:id", deleteLibraryHandler(db))
 

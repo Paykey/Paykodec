@@ -95,6 +95,42 @@ func listLibrariesHandler(db *sql.DB) gin.HandlerFunc {
 	}
 }
 
+func getLibraryHandler(db *sql.DB) gin.HandlerFunc {
+	return getLibraryHandlerWithFetcher(func(id int) (library, error) {
+		return fetchLibraryByID(db, id)
+	})
+}
+
+func getLibraryHandlerWithFetcher(fetcher func(id int) (library, error)) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		// 경로 파라미터(:id)를 정수로 파싱한다.
+		id, err := parseLibraryID(c.Param("id"))
+		if err != nil {
+			writeJSON(c, http.StatusBadRequest, messageResponse{
+				Message: err.Error(),
+			})
+			return
+		}
+
+		item, err := fetcher(id)
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				writeJSON(c, http.StatusNotFound, messageResponse{
+					Message: "library not found",
+				})
+				return
+			}
+
+			writeJSON(c, http.StatusInternalServerError, messageResponse{
+				Message: "failed to fetch library",
+			})
+			return
+		}
+
+		writeJSON(c, http.StatusOK, item)
+	}
+}
+
 func createLibraryHandler(db libraryCreator) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// 요청 본문 JSON을 읽고, 공백 제거와 필수값 검사를 함께 수행한다.
@@ -199,6 +235,21 @@ func parseLibraryID(raw string) (int, error) {
 	}
 
 	return id, nil
+}
+
+func fetchLibraryByID(db *sql.DB, id int) (library, error) {
+	var item library
+
+	err := db.QueryRow(`
+		SELECT id, name, folder_path
+		FROM libraries
+		WHERE id = $1
+	`, id).Scan(&item.ID, &item.Name, &item.FolderPath)
+	if err != nil {
+		return library{}, err
+	}
+
+	return item, nil
 }
 
 func decodeCreateLibraryReq(c *gin.Context) (createLibraryRequest, error) {

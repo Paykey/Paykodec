@@ -36,6 +36,9 @@ async function parseError(res: Response): Promise<string> {
 
 export default function App() {
   const [libraries, setLibraries] = useState<Library[]>([]);
+  const [selectedLibrary, setSelectedLibrary] = useState<Library | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState("");
   const [name, setName] = useState("");
   const [folderPath, setFolderPath] = useState("");
   const [loading, setLoading] = useState(false);
@@ -118,6 +121,33 @@ export default function App() {
     }
   }
 
+  async function openLibraryDetail(id: number) {
+    setDetailLoading(true);
+    setDetailError("");
+    setSelectedLibrary(null);
+
+    try {
+      const res = await fetch(`${apiBase}/libraries/${id}`);
+      if (!res.ok) {
+        setDetailError(await parseError(res));
+        return;
+      }
+
+      const data = (await res.json()) as Library;
+      setSelectedLibrary(data);
+    } catch {
+      setDetailError("Cannot load library details right now.");
+    } finally {
+      setDetailLoading(false);
+    }
+  }
+
+  function closeLibraryDetail() {
+    setSelectedLibrary(null);
+    setDetailError("");
+    setDetailLoading(false);
+  }
+
   return (
     <div className="page">
       <header className="topbar">
@@ -180,7 +210,12 @@ export default function App() {
                 ) : (
                   libraries.map((lib) => (
                     <div className="media-card" key={`${row.id}-${lib.id}`}>
-                      <div className="media-poster" />
+                      <button
+                        className="media-poster media-open-btn"
+                        type="button"
+                        onClick={() => openLibraryDetail(lib.id)}
+                        aria-label={`Open ${lib.name} details`}
+                      />
                       <div className="media-meta">
                         <strong>{lib.name}</strong>
                         <span>{lib.folder_path}</span>
@@ -201,6 +236,35 @@ export default function App() {
           ))}
         </section>
       </main>
+
+      {(detailLoading || detailError || selectedLibrary) && (
+        <div className="modal-backdrop" role="presentation" onClick={closeLibraryDetail}>
+          <section
+            className="modal"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Library detail"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button type="button" className="modal-close" onClick={closeLibraryDetail}>
+              x
+            </button>
+            {detailLoading && <p>Loading details...</p>}
+            {!detailLoading && detailError && <p className="error">{detailError}</p>}
+            {!detailLoading && selectedLibrary && (
+              <>
+                <h3>{selectedLibrary.name}</h3>
+                <p>
+                  <strong>ID:</strong> {selectedLibrary.id}
+                </p>
+                <p>
+                  <strong>Folder:</strong> {selectedLibrary.folder_path}
+                </p>
+              </>
+            )}
+          </section>
+        </div>
+      )}
     </div>
   );
 }

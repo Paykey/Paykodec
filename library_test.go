@@ -115,6 +115,58 @@ func TestCreateLibraryDuplicatePathConflict(t *testing.T) {
 	}
 }
 
+func TestGetLibraryRejectsInvalidID(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	c.Params = gin.Params{{Key: "id", Value: "abc"}}
+
+	handler := getLibraryHandlerWithFetcher(func(id int) (library, error) {
+		return library{}, nil
+	})
+	handler(c)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected status %d, got %d", http.StatusBadRequest, rec.Code)
+	}
+}
+
+func TestGetLibraryReturnsNotFound(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	c.Params = gin.Params{{Key: "id", Value: "999"}}
+
+	handler := getLibraryHandlerWithFetcher(func(id int) (library, error) {
+		return library{}, sql.ErrNoRows
+	})
+	handler(c)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("expected status %d, got %d", http.StatusNotFound, rec.Code)
+	}
+}
+
+func TestGetLibraryReturnsOK(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	c.Params = gin.Params{{Key: "id", Value: "1"}}
+
+	handler := getLibraryHandlerWithFetcher(func(id int) (library, error) {
+		return library{
+			ID:         id,
+			Name:       "Movies",
+			FolderPath: "D:/media/movies",
+		}, nil
+	})
+	handler(c)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, rec.Code)
+	}
+}
+
 func TestDeleteLibraryRejectsInvalidID(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	rec := httptest.NewRecorder()
