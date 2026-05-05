@@ -25,6 +25,9 @@ func main() {
 	if err := runInitSQL(db); err != nil {
 		log.Fatal("error:", err)
 	}
+	if err := ensureDefaultAdmin(db); err != nil {
+		log.Fatal("error:", err)
+	}
 
 	// Gin 엔진을 만들고 상태 확인용 API와 라이브러리 API를 등록한다.
 	router := setupRouter(db)
@@ -48,10 +51,29 @@ func setupRouter(db *sql.DB) *gin.Engine {
 
 	router.GET("/health", healthHandler)
 	router.GET("/health/db", healthDBHandler(db))
+	router.POST("/auth/register", registerHandler(db))
+	router.POST("/auth/login", loginHandler(db))
 	router.GET("/libraries", listLibrariesHandler(db))
 	router.GET("/libraries/:id", getLibraryHandler(db))
-	router.POST("/libraries", createLibraryHandler(db))
-	router.DELETE("/libraries/:id", deleteLibraryHandler(db))
+	router.GET("/libraries/:id/media", listLibraryMediaItemsHandler(db))
+
+	protected := router.Group("/")
+	protected.Use(authMiddleware())
+	protected.PATCH("/me/password", changeOwnPasswordHandler(db))
+
+	libraryWriters := router.Group("/")
+	libraryWriters.Use(authMiddleware())
+	libraryWriters.Use(adminOnlyMiddleware())
+	libraryWriters.POST("/libraries", createLibraryHandler(db))
+	libraryWriters.DELETE("/libraries/:id", deleteLibraryHandler(db))
+
+	admin := router.Group("/admin")
+	admin.Use(authMiddleware())
+	admin.Use(adminOnlyMiddleware())
+	admin.POST("/users", createUserByAdminHandler(db))
+	admin.GET("/users", listUsersHandler(db))
+	admin.PATCH("/users/:id/admin", setUserAdminHandler(db))
+	admin.DELETE("/users/:id", deleteUserHandler(db))
 
 	return router
 }
@@ -59,8 +81,8 @@ func setupRouter(db *sql.DB) *gin.Engine {
 func corsMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		c.Writer.Header().Set("Access-Control-Allow-Origin", "http://localhost:5173")
-		c.Writer.Header().Set("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS")
-		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+		c.Writer.Header().Set("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS")
+		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 
 		if c.Request.Method == http.MethodOptions {
 			c.AbortWithStatus(http.StatusNoContent)

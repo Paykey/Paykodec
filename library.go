@@ -24,6 +24,15 @@ type createLibraryRequest struct {
 	FolderPath string `json:"folder_path"`
 }
 
+type mediaItem struct {
+	ID              int    `json:"id"`
+	LibraryID       int    `json:"library_id"`
+	Title           string `json:"title"`
+	FilePath        string `json:"file_path"`
+	Container       string `json:"container"`
+	DurationSeconds int    `json:"duration_seconds"`
+}
+
 type libraryCreator interface {
 	Exec(query string, args ...any) (sql.Result, error)
 }
@@ -128,6 +137,51 @@ func getLibraryHandlerWithFetcher(fetcher func(id int) (library, error)) gin.Han
 		}
 
 		writeJSON(c, http.StatusOK, item)
+	}
+}
+
+func listLibraryMediaItemsHandler(db *sql.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		libraryID, err := parseLibraryID(c.Param("id"))
+		if err != nil {
+			writeJSON(c, http.StatusBadRequest, messageResponse{Message: err.Error()})
+			return
+		}
+
+		rows, err := db.Query(`
+			SELECT id, library_id, title, file_path, COALESCE(container, ''), COALESCE(duration_seconds, 0)
+			FROM media_items
+			WHERE library_id = $1
+			ORDER BY id ASC
+		`, libraryID)
+		if err != nil {
+			writeJSON(c, http.StatusInternalServerError, messageResponse{Message: "failed to fetch media items"})
+			return
+		}
+		defer rows.Close()
+
+		items := make([]mediaItem, 0)
+		for rows.Next() {
+			var item mediaItem
+			if err := rows.Scan(
+				&item.ID,
+				&item.LibraryID,
+				&item.Title,
+				&item.FilePath,
+				&item.Container,
+				&item.DurationSeconds,
+			); err != nil {
+				writeJSON(c, http.StatusInternalServerError, messageResponse{Message: "failed to scan media row"})
+				return
+			}
+			items = append(items, item)
+		}
+		if err := rows.Err(); err != nil {
+			writeJSON(c, http.StatusInternalServerError, messageResponse{Message: "failed while reading media rows"})
+			return
+		}
+
+		writeJSON(c, http.StatusOK, items)
 	}
 }
 

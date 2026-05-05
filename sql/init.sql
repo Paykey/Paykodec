@@ -34,3 +34,6 @@ CREATE TABLE IF NOT EXISTS user_media_data (
     last_played_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (user_id, media_item_id)
 );
+
+ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS is_admin BOOLEAN NOT NULL DEFAULT FALSE;

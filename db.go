@@ -8,6 +8,7 @@ import (
 
 	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
+	"golang.org/x/crypto/bcrypt"
 )
 
 func loadEnv() {
@@ -54,6 +55,48 @@ func runInitSQL(db *sql.DB) error {
 	// 읽어온 SQL을 실행해서 필요한 테이블을 만든다.
 	if _, err := db.Exec(string(sqlBytes)); err != nil {
 		return fmt.Errorf("failed to create tables: %w", err)
+	}
+
+	return nil
+}
+
+func ensureDefaultAdmin(db *sql.DB) error {
+	const defaultAdminUsername = "admin"
+	const defaultAdminPassword = "admin"
+
+	var existingID int
+	err := db.QueryRow(`
+		SELECT id
+		FROM users
+		WHERE username = $1
+	`, defaultAdminUsername).Scan(&existingID)
+	if err == nil {
+		// 이미 admin 계정이 있으면 초기 비밀번호를 다시 덮어쓰지 않는다.
+		_, promoteErr := db.Exec(`
+			UPDATE users
+			SET is_admin = TRUE
+			WHERE id = $1
+		`, existingID)
+		if promoteErr != nil {
+			return fmt.Errorf("failed to ensure admin role for default admin: %w", promoteErr)
+		}
+		return nil
+	}
+	if err != nil && err != sql.ErrNoRows {
+		return fmt.Errorf("failed to check default admin user: %w", err)
+	}
+
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(defaultAdminPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return fmt.Errorf("failed to hash default admin password: %w", err)
+	}
+
+	_, err = db.Exec(`
+		INSERT INTO users (username, password_hash, is_admin)
+		VALUES ($1, $2, TRUE)
+	`, defaultAdminUsername, string(hashedPassword))
+	if err != nil {
+		return fmt.Errorf("failed to ensure default admin user: %w", err)
 	}
 
 	return nil

@@ -1,2 +1,3 @@
 .env
 postgres_data/
+DEV_CONTEXT_PRIVATE.md
